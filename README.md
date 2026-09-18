@@ -17,6 +17,7 @@ banco de dados.
 
 ## Passo a passo pra colocar no ar
 
+
 ### 1. Criar o projeto no Supabase (grátis)
 
 1. Crie uma conta em [supabase.com](https://supabase.com) e um novo projeto (escolha uma região
