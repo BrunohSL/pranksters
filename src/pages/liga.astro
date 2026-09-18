@@ -3,8 +3,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import LeagueTable from '../components/react/LeagueTable';
 ---
 
-<BaseLayout title="Liga" description="Classificação da liga semanal Pranksters na Muito!">
-  <h1 class="font-display mb-2 text-3xl font-bold">Liga semanal</h1>
-  <p class="mb-6 text-white/50">Classificação acumulada da nossa liga na Muito!.</p>
+<BaseLayout title="Liga" description="Ligas e torneios do Team Pranksters">
+  <h1 class="font-display mb-2 text-3xl font-bold">Liga</h1>
+  <p class="mb-6 text-white/50">Escolha a liga e veja a classificação ou o resultado de cada rodada.</p>
   <LeagueTable client:load />
 </BaseLayout>
