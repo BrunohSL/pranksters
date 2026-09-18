@@ -15,5 +15,4 @@ export default defineConfig({
   // GitHub Pages: repositório "prankstersvgc.github.io" dentro da organização "prankstersvgc"
   // -> o site fica na raiz, sem caminho base.
   site: 'https://prankstersvgc.github.io',
-  base: '/pranksters'
 });

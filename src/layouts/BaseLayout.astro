@@ -3,7 +3,7 @@ import '../styles/global.css';
 import { base } from '../lib/base';
 
 interface Props {
-  title: string;
+  title?: string;
   description?: string;
 }
 
@@ -11,6 +11,8 @@ const {
   title,
   description = 'Time Pranksters de Pokémon VGC — liga semanal, amistosos, torneios e resultados.',
 } = Astro.props;
+
+const pageTitle = title ? `${title} · Pranksters VGC` : 'Pranksters VGC';
 
 const navLinks = [
   { href: '/', label: 'Início' },
@@ -27,7 +29,8 @@ const currentPath = Astro.url.pathname;
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <link rel="icon" type="image/png" href={`${base}favicon.png`} />
+    <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
@@ -37,7 +40,7 @@ const currentPath = Astro.url.pathname;
       href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <title>{title} · Pranksters VGC</title>
+    <title>{pageTitle}</title>
   </head>
   <body class="min-h-screen bg-prank-bg text-white antialiased">
     <header class="border-b border-prank-border bg-prank-surface/80 backdrop-blur sticky top-0 z-40">
