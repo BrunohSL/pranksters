@@ -30,11 +30,10 @@ banco de dados.
    "Esqueci minha senha" antes do primeiro login — ela define a própria senha por e-mail sem
    nunca precisar saber a temporária.
 5. Vá em **Authentication > URL Configuration** e configure:
-   - **Site URL**: `https://SEU-USUARIO.github.io/pranksters` (ou a raiz, se o repositório for
-     `SEU-USUARIO.github.io`)
-   - **Redirect URLs**: adicione a mesma URL acima com `/admin/redefinir-senha` no final, e
-     também a versão local `http://localhost:4321/pranksters/admin/redefinir-senha` (pra
-     conseguir testar o "esqueci minha senha" rodando local).
+   - **Site URL**: `https://pranksters.github.io`
+   - **Redirect URLs**: adicione `https://pranksters.github.io/admin/redefinir-senha`, e também
+     a versão local `http://localhost:4321/admin/redefinir-senha` (pra conseguir testar o
+     "esqueci minha senha" rodando local).
 
    Sem isso o link de redefinição de senha do e-mail não funciona (o Supabase recusa redirecionar
    pra uma URL que não está nessa lista).
@@ -54,34 +53,36 @@ npm install
 npm run dev
 ```
 
-Abre em `http://localhost:4321/pranksters/` (o `/pranksters/` é o caminho base — veja o passo 5).
+Abre em `http://localhost:4321/`.
 
-### 4. Subir pro GitHub
+### 4. Criar a organização e o repositório no GitHub
+
+O site usa uma **organização do GitHub** chamada `pranksters` (não uma conta pessoal), pra ficar
+com a URL limpa (`pranksters.github.io`) e pros 4 administrarem juntos sem senha compartilhada:
+
+1. No GitHub, crie uma **Organization** chamada `pranksters` (grátis). Sua conta vira Owner.
+2. Convide os outros 3 membros pra organização (Settings > People > Invite member).
+3. Dentro da organização, crie um repositório chamado **exatamente** `pranksters.github.io`
+   (pode ser público).
 
 ```sh
 git init
 git add .
 git commit -m "Site inicial do Team Pranksters"
+git remote add origin https://github.com/pranksters/pranksters.github.io.git
+git push -u origin main
 ```
-
-Crie um repositório no GitHub (pode ser público) e faça o push. Duas opções de nome, ver passo 5.
 
 ### 5. Ativar o GitHub Pages
 
 Em **Settings > Pages** do repositório, em "Build and deployment", escolha **GitHub Actions**
 (o workflow já está em `.github/workflows/deploy.yml`, ele builda e publica sozinho a cada push
-na branch `main`).
+na branch `main`). O `astro.config.mjs` já está configurado pra essa URL
+(`site: 'https://pranksters.github.io'`, sem caminho base).
 
-Duas formas de nomear o repositório — escolha uma e ajuste `astro.config.mjs`:
-
-- **`<seu-usuario>.github.io`** → site fica em `https://<seu-usuario>.github.io/` (raiz, mais
-  limpo). Nesse caso remova a linha `base: '/pranksters'` do `astro.config.mjs`.
-- **Qualquer outro nome** (ex: `pranksters`) → site fica em
-  `https://<seu-usuario>.github.io/pranksters/`. Deixe `base: '/pranksters'` (ajustando o nome se
-  o repositório tiver outro).
-
-Em ambos os casos, ajuste `site: 'https://SEU-USUARIO.github.io'` no `astro.config.mjs` com seu
-usuário real.
+Se o nome `pranksters` já estiver em uso no GitHub e vocês precisarem escolher outro nome de
+organização/repositório, é só ajustar o `site` no `astro.config.mjs` de acordo (e adicionar
+`base: '/nome-do-repo'` se o repositório não se chamar `<nome>.github.io`).
 
 ### 6. Configurar os secrets do build
 
