@@ -116,6 +116,36 @@ interface ResultRow {
   league_players: { name: string } | null;
 }
 
+interface RosterPlayer {
+  player_id: string;
+  player_name: string;
+}
+
+interface RoundEntry {
+  player_id: string;
+  name: string;
+  checked: boolean;
+  wins: number;
+  losses: number;
+  resultId: string | null;
+}
+
+function buildRoundEntries(roster: RosterPlayer[], results: ResultRow[]): RoundEntry[] {
+  return roster
+    .map((p) => {
+      const existing = results.find((r) => r.player_id === p.player_id);
+      return {
+        player_id: p.player_id,
+        name: p.player_name,
+        checked: Boolean(existing),
+        wins: existing?.wins ?? 0,
+        losses: existing?.losses ?? 0,
+        resultId: existing?.id ?? null,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+}
+
 function LeagueRoundPanel() {
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [activeSeason, setActiveSeason] = useState<Season | null>(null);
@@ -125,13 +155,16 @@ function LeagueRoundPanel() {
 
   const [rounds, setRounds] = useState<Round[]>([]);
   const [selectedRound, setSelectedRound] = useState<Round | null>(null);
-  const [results, setResults] = useState<ResultRow[]>([]);
+  const [seasonRoster, setSeasonRoster] = useState<RosterPlayer[]>([]);
+  const [roundEntries, setRoundEntries] = useState<RoundEntry[]>([]);
+  const [saving, setSaving] = useState(false);
   const [newRoundNumber, setNewRoundNumber] = useState(1);
   const [newRoundDate, setNewRoundDate] = useState(today());
   const [playerName, setPlayerName] = useState('');
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
 
   async function loadSeasons() {
     const { data } = await supabase
@@ -156,17 +189,31 @@ function LeagueRoundPanel() {
     setNewRoundNumber((list[0]?.round_number ?? 0) + 1);
   }
 
-  async function loadResults(roundId: string) {
+  async function loadSeasonRoster(seasonId: string) {
+    const { data } = await supabase
+      .from('league_standings')
+      .select('player_id, player_name')
+      .eq('season_id', seasonId);
+    const roster = (data as RosterPlayer[]) ?? [];
+    setSeasonRoster(roster);
+    return roster;
+  }
+
+  async function loadResults(roundId: string, roster: RosterPlayer[]) {
     const { data } = await supabase
       .from('league_results')
       .select('id, player_id, wins, losses, points, league_players(name)')
       .eq('round_id', roundId);
-    setResults((data as unknown as ResultRow[]) ?? []);
+    const list = (data as unknown as ResultRow[]) ?? [];
+    setRoundEntries(buildRoundEntries(roster, list));
   }
 
   useEffect(() => {
     loadSeasons().then((active) => {
-      if (active) loadRounds(active.id);
+      if (active) {
+        loadRounds(active.id);
+        loadSeasonRoster(active.id);
+      }
     });
   }, []);
 
@@ -185,9 +232,12 @@ function LeagueRoundPanel() {
     setSeasonName('');
     setSeasonRounds(8);
     setSelectedRound(null);
-    setResults([]);
+    setRoundEntries([]);
     const active = await loadSeasons();
-    if (active) loadRounds(active.id);
+    if (active) {
+      loadRounds(active.id);
+      loadSeasonRoster(active.id);
+    }
   }
 
   async function endSeason() {
@@ -200,8 +250,9 @@ function LeagueRoundPanel() {
       return;
     await supabase.from('league_seasons').update({ is_active: false }).eq('id', activeSeason.id);
     setSelectedRound(null);
-    setResults([]);
+    setRoundEntries([]);
     setRounds([]);
+    setSeasonRoster([]);
     loadSeasons();
   }
 
@@ -224,12 +275,13 @@ function LeagueRoundPanel() {
     }
     await loadRounds(activeSeason.id);
     setSelectedRound(data as Round);
-    setResults([]);
+    // rodada nova, sem resultados ainda — lista o elenco da temporada todo desmarcado
+    setRoundEntries(buildRoundEntries(seasonRoster, []));
   }
 
   async function selectRound(round: Round) {
     setSelectedRound(round);
-    await loadResults(round.id);
+    await loadResults(round.id, seasonRoster);
   }
 
   async function deleteRound(round: Round) {
@@ -237,15 +289,65 @@ function LeagueRoundPanel() {
     await supabase.from('league_rounds').delete().eq('id', round.id);
     if (selectedRound?.id === round.id) {
       setSelectedRound(null);
-      setResults([]);
+      setRoundEntries([]);
     }
     if (activeSeason) loadRounds(activeSeason.id);
   }
 
-  async function addResult(e: FormEvent) {
-    e.preventDefault();
+  function updateEntry(playerId: string, patch: Partial<RoundEntry>) {
+    setRoundEntries((prev) =>
+      prev.map((entry) => (entry.player_id === playerId ? { ...entry, ...patch } : entry)),
+    );
+  }
+
+  async function saveRoundEntries() {
     if (!selectedRound) return;
     setError(null);
+    setSaving(true);
+
+    const toSave = roundEntries.filter((e) => e.checked);
+    const toRemove = roundEntries.filter((e) => !e.checked && e.resultId);
+
+    if (toSave.length > 0) {
+      const { error: upsertErr } = await supabase.from('league_results').upsert(
+        toSave.map((e) => ({
+          round_id: selectedRound.id,
+          player_id: e.player_id,
+          wins: e.wins,
+          losses: e.losses,
+        })),
+        { onConflict: 'round_id,player_id' },
+      );
+      if (upsertErr) {
+        setError(upsertErr.message);
+        setSaving(false);
+        return;
+      }
+    }
+
+    if (toRemove.length > 0) {
+      const { error: deleteErr } = await supabase
+        .from('league_results')
+        .delete()
+        .in(
+          'id',
+          toRemove.map((e) => e.resultId as string),
+        );
+      if (deleteErr) {
+        setError(deleteErr.message);
+        setSaving(false);
+        return;
+      }
+    }
+
+    await loadResults(selectedRound.id, seasonRoster);
+    setSaving(false);
+  }
+
+  async function addResult(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedRound || !activeSeason) return;
+    setAddError(null);
 
     let playerId: string;
     const { data: existing } = await supabase
@@ -263,7 +365,7 @@ function LeagueRoundPanel() {
         .select()
         .single();
       if (createErr) {
-        setError(createErr.message);
+        setAddError(createErr.message);
         return;
       }
       playerId = created.id;
@@ -274,19 +376,15 @@ function LeagueRoundPanel() {
       { onConflict: 'round_id,player_id' },
     );
     if (resultErr) {
-      setError(resultErr.message);
+      setAddError(resultErr.message);
       return;
     }
 
     setPlayerName('');
     setWins(0);
     setLosses(0);
-    loadResults(selectedRound.id);
-  }
-
-  async function deleteResult(id: string) {
-    await supabase.from('league_results').delete().eq('id', id);
-    if (selectedRound) loadResults(selectedRound.id);
+    const roster = await loadSeasonRoster(activeSeason.id);
+    loadResults(selectedRound.id, roster);
   }
 
   return (
@@ -358,8 +456,8 @@ function LeagueRoundPanel() {
       </div>
 
       {activeSeason && (
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className={cardClass}>
+        <div className="flex flex-col gap-6 md:flex-row">
+          <div className={cardClass + ' md:w-80 md:flex-none'}>
             <h3 className="font-display mb-3 text-lg font-semibold">Nova rodada</h3>
             <form onSubmit={createRound} className="flex flex-col gap-3">
               <div>
@@ -420,7 +518,7 @@ function LeagueRoundPanel() {
             </ul>
           </div>
 
-          <div className={cardClass}>
+          <div className={cardClass + ' flex-1'}>
             {!selectedRound ? (
               <p className="text-white/50">
                 Crie ou selecione uma rodada à esquerda para lançar os resultados dos jogadores.
@@ -430,7 +528,97 @@ function LeagueRoundPanel() {
                 <h3 className="font-display mb-3 text-lg font-semibold">
                   Resultados · Rodada {selectedRound.round_number}
                 </h3>
-                <form onSubmit={addResult} className="mb-4 flex flex-col gap-3">
+
+                {roundEntries.length === 0 ? (
+                  <p className="mb-4 text-sm text-white/40">
+                    Nenhum jogador na temporada ainda. Cadastre o primeiro no formulário abaixo.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mb-2 text-xs text-white/40">
+                      Marque quem jogou essa rodada e ajusta o placar. Quem não jogou fica
+                      desmarcado e não soma ponto nenhum.
+                    </p>
+                    <div className="mb-4 overflow-x-auto rounded-lg border border-prank-border">
+                      <table className="w-full min-w-[420px] text-left text-sm">
+                        <thead className="bg-prank-surface-2 text-xs uppercase tracking-wide text-white/50">
+                          <tr>
+                            <th className="px-3 py-2">Jogou</th>
+                            <th className="px-3 py-2">Jogador</th>
+                            <th className="px-3 py-2 text-center">V</th>
+                            <th className="px-3 py-2 text-center">D</th>
+                            <th className="px-3 py-2 text-right">Pts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {roundEntries.map((entry) => (
+                            <tr key={entry.player_id} className="border-t border-prank-border/60">
+                              <td className="px-3 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={entry.checked}
+                                  onChange={(e) =>
+                                    updateEntry(entry.player_id, { checked: e.target.checked })
+                                  }
+                                  className="h-4 w-4 accent-prank-purple"
+                                />
+                              </td>
+                              <td
+                                className={'px-3 py-2 ' + (entry.checked ? '' : 'text-white/40')}
+                              >
+                                {entry.name}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  disabled={!entry.checked}
+                                  value={entry.wins}
+                                  onChange={(e) =>
+                                    updateEntry(entry.player_id, { wins: Number(e.target.value) })
+                                  }
+                                  className="w-14 rounded border border-prank-border bg-prank-bg px-2 py-1 text-center text-white outline-none focus:border-prank-gold disabled:opacity-30"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  disabled={!entry.checked}
+                                  value={entry.losses}
+                                  onChange={(e) =>
+                                    updateEntry(entry.player_id, {
+                                      losses: Number(e.target.value),
+                                    })
+                                  }
+                                  className="w-14 rounded border border-prank-border bg-prank-bg px-2 py-1 text-center text-white outline-none focus:border-prank-gold disabled:opacity-30"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right font-display font-semibold text-prank-gold">
+                                {entry.checked ? entry.wins * 3 + 1 : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+                    <button
+                      type="button"
+                      onClick={saveRoundEntries}
+                      disabled={saving}
+                      className={buttonClass}
+                    >
+                      {saving ? 'Salvando...' : 'Salvar rodada'}
+                    </button>
+                  </>
+                )}
+
+                <h4 className="mt-6 mb-2 text-sm font-semibold text-white/50">
+                  Jogador novo nesta rodada
+                </h4>
+                <form onSubmit={addResult} className="flex flex-col gap-3">
                   <div>
                     <label className={labelClass}>Nome do jogador</label>
                     <input
@@ -467,32 +655,11 @@ function LeagueRoundPanel() {
                     Pontos calculados automaticamente: <strong>{wins * 3 + 1}</strong> (3 por
                     vitória + 1 de participação)
                   </p>
-                  {error && <p className="text-sm text-red-400">{error}</p>}
+                  {addError && <p className="text-sm text-red-400">{addError}</p>}
                   <button type="submit" className={buttonClass}>
-                    Adicionar jogador
+                    Adicionar à rodada
                   </button>
                 </form>
-
-                <ul className="flex flex-col gap-1">
-                  {results.map((r) => (
-                    <li
-                      key={r.id}
-                      className="flex items-center justify-between rounded bg-prank-surface-2 px-3 py-2 text-sm"
-                    >
-                      <span>
-                        {r.league_players?.name} — {r.wins}V {r.losses}D — {r.points}pts
-                      </span>
-                      <button onClick={() => deleteResult(r.id)} className={deleteButtonClass}>
-                        remover
-                      </button>
-                    </li>
-                  ))}
-                  {results.length === 0 && (
-                    <p className="text-sm text-white/40">
-                      Nenhum jogador lançado nesta rodada ainda.
-                    </p>
-                  )}
-                </ul>
               </>
             )}
           </div>
