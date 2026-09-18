@@ -1,0 +1,114 @@
+---
+import '../styles/global.css';
+import { base } from '../lib/base';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const {
+  title,
+  description = 'Time Pranksters de Pokémon VGC — liga semanal, amistosos, torneios e resultados.',
+} = Astro.props;
+
+const navLinks = [
+  { href: '/', label: 'Início' },
+  { href: '/liga', label: 'Liga' },
+  { href: '/amistosos', label: 'Amistosos' },
+  { href: '/torneios', label: 'Torneios' },
+  { href: '/galeria', label: 'Galeria' },
+];
+
+const currentPath = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>{title} · Pranksters VGC</title>
+  </head>
+  <body class="min-h-screen bg-prank-bg text-white antialiased">
+    <header class="border-b border-prank-border bg-prank-surface/80 backdrop-blur sticky top-0 z-40">
+      <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
+        <a href={base} class="flex items-center gap-3 shrink-0">
+          <img
+            src={`${base}images/pranksters-logo.jpg`}
+            alt="Logo Team Pranksters"
+            width="40"
+            height="40"
+            class="h-10 w-10 rounded-full object-cover ring-1 ring-prank-gold/60"
+          />
+          <span class="font-display text-lg font-bold tracking-wide text-white">
+            PRANKSTERS<span class="text-prank-gold"> VGC</span>
+          </span>
+        </a>
+
+        <nav class="flex flex-wrap items-center gap-1 text-sm">
+          {
+            navLinks.map((link) => {
+              const href = link.href === '/' ? base : `${base}${link.href.slice(1)}`;
+              const isActive =
+                link.href === '/' ? currentPath === base : currentPath.startsWith(href);
+              return (
+                <a
+                  href={href}
+                  class:list={[
+                    'rounded-md px-3 py-2 font-medium transition-colors hover:bg-prank-surface-2 hover:text-prank-gold',
+                    isActive ? 'text-prank-gold' : 'text-prank-purple-light',
+                  ]}
+                >
+                  {link.label}
+                </a>
+              );
+            })
+          }
+          <a
+            href={`${base}admin`}
+            class="ml-1 rounded-md border border-prank-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white/60 hover:border-prank-gold hover:text-prank-gold"
+          >
+            Área do time
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-5xl px-4 py-10">
+      <slot />
+    </main>
+
+    <footer class="mt-16 border-t border-prank-border bg-prank-surface/60">
+      <div class="mx-auto flex max-w-5xl flex-col items-center gap-4 px-4 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
+        <div class="text-sm text-white/50">
+          <p class="font-display text-base text-white">Team Pranksters</p>
+          <p>Pokémon VGC · Liga semanal e amistosos</p>
+        </div>
+        <a
+          href="#"
+          class="flex items-center gap-3 rounded-lg border border-prank-border bg-prank-surface-2 px-4 py-2 transition-colors hover:border-prank-gold"
+        >
+          <span class="text-xs uppercase tracking-wide text-white/50">Patrocinado por</span>
+          <img
+            src={`${base}images/muito-logo.jpg`}
+            alt="Logo Muito!"
+            width="72"
+            height="72"
+            loading="lazy"
+            class="h-9 w-9 rounded object-cover"
+          />
+        </a>
+      </div>
+    </footer>
+  </body>
+</html>

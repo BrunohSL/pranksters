@@ -1,0 +1,9 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminDashboard from '../../components/react/AdminDashboard';
+---
+
+<BaseLayout title="Painel do time">
+  <h1 class="font-display mb-6 text-3xl font-bold">Painel do time</h1>
+  <AdminDashboard client:load />
+</BaseLayout>

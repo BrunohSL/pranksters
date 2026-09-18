@@ -1,0 +1,10 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TournamentsList from '../components/react/TournamentsList';
+---
+
+<BaseLayout title="Torneios" description="Torneios de Pokémon VGC na região.">
+  <h1 class="font-display mb-2 text-3xl font-bold">Torneios</h1>
+  <p class="mb-6 text-white/50">Torneios da região com data confirmada.</p>
+  <TournamentsList client:load />
+</BaseLayout>
